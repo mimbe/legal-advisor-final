@@ -3,18 +3,41 @@ import faiss
 import numpy as np
 import json
 import os
+import requests
 from openai import OpenAI
-from dotenv import load_dotenv
-load_dotenv()
 
-
-
+app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Load FAISS index and chunk metadata
-faiss_index = faiss.read_index("data/faiss_index.index")
-with open("data/chunk_metadata.json", "r", encoding="utf-8") as f:
-    chunks = json.load(f)
+# مسیرها در سطح فایل
+FAISS_PATH = "data/faiss_index.index"
+FAISS_URL = "https://github.com/mimbe/legal-advisor-final/releases/download/v1/faiss_index.index"
+
+# بررسی و دانلود فایل FAISS در صورت نیاز و بارگذاری آن
+def load_faiss_index():
+    if not os.path.exists(FAISS_PATH):
+        print("📥 Downloading FAISS index from GitHub Releases...")
+        os.makedirs("data", exist_ok=True)
+        response = requests.get(FAISS_URL, timeout=10)
+        if response.status_code == 200:
+            with open(FAISS_PATH, "wb") as f:
+                f.write(response.content)
+        else:
+            raise RuntimeError(f"❌ Failed to download FAISS index. Status code: {response.status_code}")
+
+    return faiss.read_index(FAISS_PATH)
+
+# متغیرها برای FAISS index و chunks
+faiss_index = None
+chunks = None
+
+def init_faiss():
+    global faiss_index, chunks
+    faiss_index = load_faiss_index()
+    with open("data/chunk_metadata.json", "r", encoding="utf-8") as f:
+        chunks = json.load(f)
+
+init_faiss()
 
 HTML_TEMPLATE = """
 <!doctype html>
@@ -104,24 +127,22 @@ def ask():
             prompt = f"""
 شما یک مشاور حقوقی تخصصی در قراردادهای پیمانکاری ایران هستید.
 
-با استناد به مواد زیر از شرایط عمومی پیمان پاسخ دهید
-توجه: شماره موادی که به آن استناد می کنید را حتما ذکر کنید
-
+با استناد به مواد زیر از شرایط عمومی پیمان پاسخ دهید.
+توجه: شماره موادی که به آن استناد می‌کنید را حتماً ذکر کنید.
 
 📘 متن مواد قانونی از شرایط عمومی پیمان:
 {context_text}
 
 ❓ سؤال:
 {question}
-❗ پاسخ را با بله یا خیر شروع نکن. به متن مواد قانونی مراجعه کن و در اگر توانستید در جملات پایانی پاسخی که ارائه میکنید از بله یا خیر استفاده کن 
-📌 اگر موضوع خارج از حوزه شرایط عمومی پیمان بود، پاسخ را فقط با این جمله شروع کنید:
-«این موضوع خارج از حوزه تخصص من به عنوان یک مشاور حقوقی پیمان است.»  
-و **به هیچ عنوان با واژه‌هایی مانند «بله»، «خیر»، «درست است» یا «می‌توان گفت» آغاز نکنید.**
-پاسخ را شفاف، حقوقی، با جمله‌بندی دقیق، رسمی و ساده و مستند به مواد قانونی موجود در متن مواد قانونی شرایط عمومی پیمان ارائه بده. از تکرار بی‌مورد و ترجمه ماشینی پرهیز کن.
+
+📌 فقط اگر اطلاعات دقیق و مرتبط در شرایط عمومی پیمان وجود دارد، پاسخ دهید. در غیر این صورت، فقط بنویسید: «این موضوع خارج از حوزه تخصص من است.»
+
+پاسخ را شفاف، حقوقی، دقیق و مستند به مواد قانونی ارائه دهید. از جمله‌های دوپهلو و ترجمه ماشینی پرهیز کنید.
 """
 
             response = client.chat.completions.create(
-               model="gpt-4o",
+                model="gpt-4o",
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
