@@ -14,9 +14,10 @@ FAISS_PATH = "data/faiss_index.index"
 FAISS_URL = "https://github.com/mimbe/legal-advisor-final/releases/download/v1/faiss_index.index"
 
 # بررسی و دانلود فایل FAISS در صورت نیاز و بارگذاری آن
+
 def load_faiss_index():
-    if not os.path.exists(FAISS_PATH):
-        print("📥 Downloading FAISS index from GitHub Releases...")
+    def download_index():
+        print("📥 Attempting to download FAISS index from GitHub Releases...")
         os.makedirs("data", exist_ok=True)
         response = requests.get(FAISS_URL, timeout=10)
         if response.status_code == 200:
@@ -25,6 +26,21 @@ def load_faiss_index():
         else:
             raise RuntimeError(f"❌ Failed to download FAISS index. Status code: {response.status_code}")
 
+    # مرحله 1: اگر فایل وجود ندارد، دانلود کن
+    if not os.path.exists(FAISS_PATH):
+        download_index()
+
+    # مرحله 2: بررسی حجم فایل
+    file_size = os.path.getsize(FAISS_PATH)
+    if file_size < 10_000:  # 10KB را حداقل در نظر گرفتیم
+        print(f"⚠️ Warning: FAISS index file seems too small ({file_size} bytes). Re-downloading...")
+        os.remove(FAISS_PATH)
+        download_index()
+        file_size = os.path.getsize(FAISS_PATH)
+        if file_size < 10_000:
+            raise RuntimeError("❌ FAISS index appears corrupted or incomplete after re-download. Please verify the source.")
+
+    # مرحله 3: بازگرداندن ایندکس
     return faiss.read_index(FAISS_PATH)
 
 # متغیرها برای FAISS index و chunks
@@ -127,7 +143,8 @@ def ask():
             prompt = f"""
 شما یک مشاور حقوقی تخصصی در قراردادهای پیمانکاری ایران هستید.
 
-با استناد به مواد زیر از شرایط عمومی پیمان، فقط در صورتی که اطلاعاتی درباره پرسش وجود دارد، پاسخ دهید و شماره ماده یا مواد قانونی مرتبط را ذکر کنید.
+با استناد به مواد زیر از شرایط عمومی پیمان پاسخ دهید.
+توجه: شماره موادی که به آن استناد می‌کنید را حتماً ذکر کنید.
 
 📘 متن مواد قانونی از شرایط عمومی پیمان:
 {context_text}
@@ -135,9 +152,9 @@ def ask():
 ❓ سؤال:
 {question}
 
-📌 پاسخ را فقط زمانی تهیه کن که اطلاعات دقیق و مرتبط در مفاد قانونی که در بالا در اختیارت قرار گرفته وجود داشته باشد. در غیر این صورت، بگو که اطلاعات مورد نیاز در مواد قانونی موجود نیست و نمی‌توان پاسخ دقیقی به این سوال داد.
-پاسخ را شفاف، حقوقی، و مستند به مواد قانونی ارائه بده.
-📌 ابتدا با تفسیر مواد قانونی به سوال جواب بده و در جملات آخر پاسخی ترجیحا حاوی "بلی" یا "خیر" یا "ممکن است" ارائه کن
+📌 فقط اگر اطلاعات دقیق و مرتبط در شرایط عمومی پیمان وجود دارد، پاسخ دهید. در غیر این صورت، فقط بنویسید: «این موضوع خارج از حوزه تخصص من است.»
+
+پاسخ را شفاف، حقوقی، دقیق و مستند به مواد قانونی ارائه دهید. از جمله‌های دوپهلو و ترجمه ماشینی پرهیز کنید.
 """
 
             response = client.chat.completions.create(
