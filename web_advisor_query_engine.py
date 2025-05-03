@@ -135,7 +135,7 @@ def ask():
             ).data[0].embedding
 
             query_vector = np.array([question_embedding]).astype("float32")
-            distances, indices = faiss_index.search(query_vector, 5)
+            distances, indices = faiss_index.search(query_vector, 10)
             matched_chunks = [chunks[i] for i in indices[0]]
 
             context_text = "\n\n".join([f"{c['title']}:\n{c['content']}" for c in matched_chunks])
@@ -152,7 +152,7 @@ def ask():
 ❓ سؤال:
 {question}
 
-📌 فقط اگر اطلاعات دقیق و مرتبط در شرایط عمومی پیمان وجود دارد، پاسخ دهید. در غیر این صورت، فقط بنویسید: «این موضوع خارج از حوزه تخصص من است.»
+📌 فقط اگر اطلاعات  مرتبط در شرایط عمومی پیمان وجود دارد، پاسخ دهید. در غیر این صورت، فقط بنویسید: «این موضوع خارج از حوزه تخصص من به عنوان مشاور حقوقی قراردادها است.»
 
 پاسخ را شفاف، حقوقی، دقیق و مستند به مواد قانونی ارائه دهید. از جمله‌های دوپهلو و ترجمه ماشینی پرهیز کنید.
 """
