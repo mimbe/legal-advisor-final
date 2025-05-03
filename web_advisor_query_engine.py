@@ -135,7 +135,7 @@ def ask():
             ).data[0].embedding
 
             query_vector = np.array([question_embedding]).astype("float32")
-            distances, indices = faiss_index.search(query_vector, 10)
+            distances, indices = faiss_index.search(query_vector, 20)
             matched_chunks = [chunks[i] for i in indices[0]]
 
             context_text = "\n\n".join([f"{c['title']}:\n{c['content']}" for c in matched_chunks])
